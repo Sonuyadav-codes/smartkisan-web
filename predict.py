@@ -2,6 +2,7 @@ import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 import sys
+import gc
 import traceback
 import cv2
 import numpy as np
@@ -61,6 +62,12 @@ def predict_disease_api(img_path):
                 binary_model = tf.keras.models.load_model(BINARY_MODEL_PATH, compile=False)
                 binary_preds = binary_model.predict(tta_batch, verbose=0)[:, 0]
                 binary_pred = float(np.mean(binary_preds))
+                
+                # Free memory after binary prediction
+                del binary_model
+                tf.keras.backend.clear_session()
+                gc.collect()
+
                 if binary_pred < 0.40:
                     invalid_confidence = float((1.0 - binary_pred) * 100.0)
                     return {
@@ -76,6 +83,11 @@ def predict_disease_api(img_path):
             disease_model = tf.keras.models.load_model(DISEASE_MODEL_PATH, compile=False)
             tta_predictions = disease_model.predict(tta_batch, verbose=0)
             predictions = np.mean(tta_predictions, axis=0)
+
+            # Free memory after disease model prediction
+            del disease_model
+            tf.keras.backend.clear_session()
+            gc.collect()
 
             per_version_top = np.argmax(tta_predictions, axis=1)
             agreement = float(np.mean(per_version_top == np.argmax(predictions)))
@@ -109,3 +121,7 @@ def predict_disease_api(img_path):
         print("---- ERROR IN PREDICT API ----", file=sys.stderr)
         traceback.print_exc()
         return {"disease": "Error", "confidence": "0.0 %", "confidence_val": 0.0, "details": str(e)}
+    finally:
+        # Final cleanup for RAM safety
+        tf.keras.backend.clear_session()
+        gc.collect()
