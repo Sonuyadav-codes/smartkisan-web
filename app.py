@@ -1,3 +1,5 @@
+import gc
+import tensorflow as tf
 import os
 import sys
 import traceback
