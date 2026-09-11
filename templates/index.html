@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌾 SmartKisan - Rice Disease Detection</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background-color: #f4f8f4; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .bg-agro { background-color: #1b5e20 !important; }
+        .image-preview-container { width: 100%; max-width: 380px; height: 280px; border: 2px dashed #a5d6a7; position: relative; }
+        #imagePreview, #webcam { width: 100%; height: 100%; object-fit: cover; }
+        .whitespace-pre { white-space: pre-line; min-height: 100px; }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar navbar-dark bg-agro shadow-sm mb-4">
+        <div class="container text-center d-block">
+            <h1 class="navbar-brand m-0 fw-bold fs-2"><i class="fa-solid fa-wheat-awn me-2"></i>SMART KISAN</h1>
+            <p class="m-0 text-light opacity-75 small">Deep Learning Based Rice Leaf Disease Detection & Advisory System</p>
+        </div>
+    </nav>
+
+    <div class="container my-2">
+        <div class="row g-4">
+            
+            <div class="col-lg-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body d-flex flex-column align-items-center justify-content-center text-center p-4">
+                        
+                        <div class="image-preview-container mb-3 shadow-inner rounded d-flex align-items-center justify-content-center bg-light">
+                            <img id="imagePreview" src="#" alt="Preview" class="img-fluid rounded d-none">
+                            <video id="webcam" autoplay playsinline class="rounded d-none w-100 h-100"></video>
+                            <div id="placeholderText" class="text-muted">
+                                <i class="fa-solid fa-cloud-arrow-up display-3 mb-2 text-success opacity-50"></i>
+                                <p class="m-0 fw-medium">No Image Selected / Camera Off</p>
+                            </div>
+                        </div>
+
+                        <canvas id="canvas" class="d-none"></canvas>
+
+                        <div class="d-flex flex-wrap gap-2 justify-content-center mt-2">
+                            <label class="btn btn-success px-3 fw-bold shadow-sm">
+                                <i class="fa-solid fa-folder-open me-2"></i>Upload File
+                                <input type="file" id="imageInput" accept="image/*" class="d-none">
+                            </label>
+                            
+                            <button id="toggleCameraBtn" class="btn btn-outline-success px-3 fw-bold shadow-sm">
+                                <i class="fa-solid fa-camera me-2"></i>Open Camera
+                            </button>
+
+                            <button id="captureBtn" class="btn btn-warning px-3 fw-bold shadow-sm d-none">
+                                <i class="fa-solid fa-circle-dot me-2"></i>Capture Photo
+                            </button>
+
+                            <button id="resetBtn" class="btn btn-danger px-3 fw-bold shadow-sm">
+                                <i class="fa-solid fa-rotate-right me-2"></i>Reset
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body p-4">
+                        <h3 class="fw-bold text-success border-bottom pb-2 mb-3">
+                            <i class="fa-solid fa-square-poll-vertical me-2"></i>Prediction Result
+                        </h3>
+
+                        <div id="loader" class="text-center my-4 d-none">
+                            <div class="spinner-border text-success" role="status"></div>
+                            <p class="mt-2 text-muted fw-medium">Analyzing Rice Leaf Image...</p>
+                        </div>
+
+                        <div id="resultContent">
+                            <div class="mb-3">
+                                <label class="fw-bold text-secondary">Disease Identified:</label>
+                                <div id="diseaseResult" class="fs-4 fw-bold text-dark p-2 bg-light rounded border">---</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="fw-bold text-secondary">Confidence Score:</label>
+                                <div id="confidenceResult" class="fs-5 fw-semibold text-dark mb-1">---</div>
+                                <div class="progress" style="height: 12px;">
+                                    <div id="progressBar" class="progress-bar bg-success" role="progressbar" style="width: 0%"></div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <label class="fw-bold text-secondary m-0">Recommended Treatment:</label>
+                                    <button id="voiceBtn" class="btn btn-sm btn-info text-white fw-bold shadow-sm">
+                                        <i class="fa-solid fa-volume-high me-1"></i>Voice Advisory
+                                    </button>
+                                </div>
+                                <div id="treatmentResult" class="p-3 bg-light rounded border text-secondary fs-6 whitespace-pre">
+                                    ---
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const imageInput = document.getElementById('imageInput');
+        const imagePreview = document.getElementById('imagePreview');
+        const webcam = document.getElementById('webcam');
+        const canvas = document.getElementById('canvas');
+        const placeholderText = document.getElementById('placeholderText');
+        const toggleCameraBtn = document.getElementById('toggleCameraBtn');
+        const captureBtn = document.getElementById('captureBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const voiceBtn = document.getElementById('voiceBtn');
+        const loader = document.getElementById('loader');
+        const diseaseResult = document.getElementById('diseaseResult');
+        const confidenceResult = document.getElementById('confidenceResult');
+        const progressBar = document.getElementById('progressBar');
+        const treatmentResult = document.getElementById('treatmentResult');
+
+        let stream = null;
+
+        imageInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                stopCamera();
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    imagePreview.src = event.target.result;
+                    imagePreview.classList.remove('d-none');
+                    webcam.classList.add('d-none');
+                    placeholderText.classList.add('d-none');
+                };
+                reader.readAsDataURL(file);
+                sendImageToServer(file);
+            }
+        });
+
+        toggleCameraBtn.addEventListener('click', async () => {
+            if (!stream) {
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    webcam.srcObject = stream;
+                    webcam.classList.remove('d-none');
+                    imagePreview.classList.add('d-none');
+                    placeholderText.classList.add('d-none');
+                    captureBtn.classList.remove('d-none');
+                    toggleCameraBtn.innerText = "Close Camera";
+                } catch (err) {
+                    alert("Camera permission denied.");
+                }
+            } else {
+                stopCamera();
+            }
+        });
+
+        captureBtn.addEventListener('click', () => {
+            if (!stream) return;
+            const context = canvas.getContext('2d');
+            canvas.width = webcam.videoWidth;
+            canvas.height = webcam.videoHeight;
+            context.drawImage(webcam, 0, 0, canvas.width, canvas.height);
+
+            canvas.toBlob((blob) => {
+                const file = new File([blob], "captured_leaf.jpg", { type: "image/jpeg" });
+                imagePreview.src = canvas.toDataURL('image/jpeg');
+                imagePreview.classList.remove('d-none');
+                webcam.classList.add('d-none');
+                stopCamera();
+                sendImageToServer(file);
+            }, 'image/jpeg');
+        });
+
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+                webcam.classList.add('d-none');
+                captureBtn.classList.add('d-none');
+                toggleCameraBtn.innerHTML = '<i class="fa-solid fa-camera me-2"></i>Open Camera';
+            }
+        }
+
+        resetBtn.addEventListener('click', () => {
+            stopCamera();
+            imageInput.value = "";
+            imagePreview.src = "#";
+            imagePreview.classList.add('d-none');
+            placeholderText.classList.remove('d-none');
+            diseaseResult.innerText = "---";
+            confidenceResult.innerText = "---";
+            progressBar.style.width = "0%";
+            treatmentResult.innerText = "---";
+        });
+
+        function sendImageToServer(file) {
+            const formData = new FormData();
+            formData.append('image', file);
+            loader.classList.remove('d-none');
+
+            fetch('/predict', { method: 'POST', body: formData })
+            .then(res => res.json())
+            .then(data => {
+                loader.classList.add('d-none');
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+                diseaseResult.innerText = data.disease;
+                confidenceResult.innerText = data.confidence;
+                progressBar.style.width = `${data.confidence_val || 0}%`;
+                treatmentResult.innerText = data.treatment;
+            })
+            .catch(err => {
+                loader.classList.add('d-none');
+                alert("Error analyzing image.");
+            });
+        }
+
+        voiceBtn.addEventListener('click', () => {
+            const textToSpeak = treatmentResult.innerText;
+            if (textToSpeak === "---" || !textToSpeak.trim()) return;
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(textToSpeak);
+            window.speechSynthesis.speak(utterance);
+        });
+    </script>
+</body>
+</html>
