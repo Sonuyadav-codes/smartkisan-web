@@ -23,21 +23,10 @@ CLASS_NAMES = [
 
 def make_tta_batch(base_img):
     versions = []
+    # 1. Original Image
     versions.append(base_img)
+    # 2. Horizontal Flip (Lightweight & Safe for RAM)
     versions.append(cv2.flip(base_img, 1))
-
-    bright = np.clip(base_img * 1.2, 0, 255)
-    versions.append(bright)
-
-    dark = np.clip(base_img * 0.8, 0, 255)
-    versions.append(dark)
-
-    h, w = base_img.shape[:2]
-    ch, cw = int(h * 0.9), int(w * 0.9)
-    y0, x0 = (h - ch) // 2, (w - cw) // 2
-    cropped = base_img[y0:y0 + ch, x0:x0 + cw]
-    zoomed = cv2.resize(cropped, (w, h))
-    versions.append(zoomed)
 
     batch = np.stack(versions, axis=0)
     # Scaling matching training dataset (0 to 1 range)
@@ -100,6 +89,7 @@ def predict_disease_api(img_path):
             top2_score = float(predictions[top2_idx] * 100.0)
             margin = float(top1_score - top2_score)
 
+            # Guardrails check
             if top1_score < 35.0 or margin < 10.0 or agreement < 0.5:
                 invalid_conf = float(100.0 - top1_score)
                 return {
