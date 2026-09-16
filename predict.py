@@ -7,7 +7,6 @@ import traceback
 import cv2
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BINARY_MODEL_PATH = os.path.join(BASE_DIR, "rice_vs_invalid_model.h5")
@@ -41,7 +40,8 @@ def make_tta_batch(base_img):
     versions.append(zoomed)
 
     batch = np.stack(versions, axis=0)
-    return preprocess_input(batch)
+    # Scaling matching training dataset (0 to 1 range)
+    return batch / 255.0
 
 def predict_disease_api(img_path):
     if not os.path.exists(img_path):
