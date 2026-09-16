@@ -1,7 +1,8 @@
-import gc
-import tensorflow as tf
 import os
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
 import sys
+import gc
 import traceback
 from flask import Flask, render_template, request, jsonify
 from werkzeug.utils import secure_filename
@@ -34,6 +35,7 @@ def home():
 
 @app.route('/predict', methods=['POST'])
 def predict():
+    filepath = None
     try:
         if 'image' not in request.files:
             return jsonify({'error': 'No image uploaded'}), 400
@@ -46,6 +48,7 @@ def predict():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
 
+        # Run Prediction Pipeline
         result = predict_disease_api(filepath)
 
         disease = str(result.get('disease', 'Invalid Image'))
@@ -71,6 +74,15 @@ def predict():
         print("---- BACKEND ERROR ----", file=sys.stderr)
         traceback.print_exc()
         return jsonify({'error': f'Server Error: {str(e)}'}), 500
+
+    finally:
+        # Prevent RAM & Disk Overload on Render Cloud
+        if filepath and os.path.exists(filepath):
+            try:
+                os.remove(filepath)
+            except Exception:
+                pass
+        gc.collect()
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
